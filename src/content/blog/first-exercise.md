@@ -83,6 +83,25 @@ Documents are the basic units of data in MongoDB, stored in a format called BSON
 }
 ```
 
+To list the databases on the mongodb instance: 
+
+```javascript
+show dbs;
+```
+
+By default, the 'test' database is selected. To switch to a different database or create a new one, type the use-command with the database name: 
+
+```javascript
+use mydb;
+```
+
+To list all collections within the selected databse: 
+
+```javascript
+show collections;
+```
+
+
 Basic CRUD Operations
 ---------------------
 
@@ -159,6 +178,20 @@ db.users.createIndex({ "email": 1 });
 db.users.getIndexes();
 ```
 
+### Testing query against Index
+
+You can check whether given query benefits from the Indexes you have, with the explain() method. It will return the execution plan of the query. 
+
+```javascript
+// Explain the execution plan of the following 'find(...)' query
+db.users.find({"email" : "janesmith@example.com"}).explain();
+```
+
+Look inside the "queryPlanner" -> "winningPlan". 
+Look for "stage" values: 
+* stage = IXSCAN ----->  index is being used
+* stage = COLLSCAN ----->  index is NOT being used
+
 Aggregation
 -----------
 
@@ -172,5 +205,11 @@ db.orders.aggregate([
   { $group: { _id: "$customerId", total: { $sum: "$amount" } } },
   { $sort: { total: -1 } }
 ]);
+```
+
+In order to run the above Aggregation Pipeline, you need to insert the the array of documents into the 'orders' collection: 
+
+```json
+[{"customerId":"CUST-001","customerName":"Jane Smith","status":"processing","amount":150.0,"time":"2026-01-12T10:15:30Z"},{"customerId":"CUST-002","customerName":"Michael Johnson","status":"shipped","amount":90.5,"time":"2026-01-13T14:22:10Z"},{"customerId":"CUST-001","customerName":"Jane Smith","status":"shipped","amount":50.0,"time":"2026-01-14T09:05:45Z"},{"customerId":"CUST-003","customerName":"Emily Davis","status":"processing","amount":230.0,"time":"2026-01-15T16:40:00Z"},{"customerId":"CUST-001","customerName":"Jane Smith","status":"shipped","amount":200.0,"time":"2026-01-16T11:55:20Z"},{"customerId":"CUST-001","customerName":"Jane Smith","status":"shipped","amount":200.0,"time":"2026-02-16T11:56:30Z"},{"customerId":"CUST-004","customerName":"Robert Brown","status":"cancelled","amount":0,"time":"2026-01-17T08:30:00Z"},{"customerId":"CUST-002","customerName":"Michael Johnson","status":"shipped","amount":100.0,"time":"2026-02-13T15:23:10Z"}]
 ```
 
