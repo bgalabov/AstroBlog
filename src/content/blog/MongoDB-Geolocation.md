@@ -1,7 +1,7 @@
 ---
 author: Vladimir Kutsev
 pubDatetime: 2025-04-08T15:50:00Z
-modDatetime: 2025-04-08T09:12:47.400Z
+modDatetime: 2026-03-29T16:55:47.400Z
 title: MongoDB Geolocation with MongoDB Compass
 slug: geolocation
 featured: false
@@ -46,7 +46,7 @@ Before we dive into geospatial features, we need to get MongoDB and Compass up a
 
 Now that the environment is ready, let’s import a real dataset of geospatial points for Bulgaria. We will use a dataset of points of interest (POIs) in Bulgaria – for example, landmarks, tourist attractions, or other noteworthy places. Ideally, this data is in GeoJSON format (GeoJSON is a JSON standard for encoding geographic data).
 
-**Getting the Data:** One convenient source of such data is OpenStreetMap. The Humanitarian OpenStreetMap Team provides an export of Points of Interest for Bulgaria as a GeoJSON file (about 3.9 MB, updated March 2025) ([Bulgaria Points of Interest (OpenStreetMap Export)](https://data.humdata.org/dataset/hotosm_bgr_points_of_interest#:~:text=GeoJSON,zip)). You can download this file (e.g., `hotosm_bgr_points_of_interest_points_geojson.zip`) which contains POI data. For the purposes of our tutorial, you might use a subset of this data filtered to Bulgaria. 
+**Getting the Data:** One convenient source of such data is OpenStreetMap. The Humanitarian OpenStreetMap Team provides an export of Points of Interest for Bulgaria as a GeoJSON file (about 4.3 MB, updated March 2026) ([Bulgaria Points of Interest (OpenStreetMap Export)](https://data.humdata.org/dataset/hotosm_bgr_points_of_interest#:~:text=GeoJSON,zip)). You can download this file (e.g., `hotosm_bgr_points_of_interest_points_geojson.zip`) which contains POI data. For the purposes of our tutorial, you might use a subset of this data filtered to Bulgaria. 
 
 Alternatively, use any GeoJSON dataset of Bulgaria that includes coordinates – for instance, a curated list of Bulgaria landmarks or cities in GeoJSON. The key is that the data should contain latitude/longitude coordinates for each entry.
 
@@ -212,7 +212,7 @@ For our dataset of points, if we use a polygon as the query shape:
 - `$geoWithin` returns points *inside* the polygon.
 - `$geoIntersects` would return points inside or exactly on the border of the polygon (since a point on the boundary intersects the polygon but isn’t strictly within it, depending on how containment is defined).
 
-In practice, for point data, `$geoIntersects` with a polygon will give almost the same result as `$geoWithin` (a point either lies inside or it doesn’t; being on the edge is a rare and fine distinction). The real power of `$geoIntersects` is when you have lines and polygons in your data – for example, finding which roads intersect a city boundary, or which areas intersect a given route. 
+In practice, for point data, like the one we imported, `$geoIntersects` with a polygon will give almost the same result as `$geoWithin` (a point either lies inside or it doesn’t; being on the edge is a rare and fine distinction). The real power of `$geoIntersects` is when you have lines and polygons in your data – for example, finding which roads intersect a city boundary, or which areas intersect a given route. 
 
 However, we can still demonstrate `$geoIntersects` usage. Let’s reuse our polygon from the previous example:
 
@@ -237,9 +237,106 @@ However, we can still demonstrate `$geoIntersects` usage. Let’s reuse our poly
 }
 ```
 
-This will return any point that **intersects** the polygon – effectively the points inside it (since points are zero-dimensional, “intersecting” just means the point lies in or on the shape). You should see the same points as the `$geoWithin` query earlier. 
+This will return any point that **intersects** the polygon – effectively the points inside it (since points are zero-dimensional, “intersecting” just means the point lies in or on the shape). You should see the same points as the `$geoWithin` query earlier.  With points, the edge case is if a point lies exactly on the boundary line of the query polygon – `$geoIntersects` would count it, `$geoWithin` might not.
 
-To truly see the difference, imagine if our collection had polygons and we queried with another polygon: `$geoWithin` would require one polygon to be entirely inside the other, whereas `$geoIntersects` would include cases where they partially overlap (share any common area or edge). With points, the edge case is if a point lies exactly on the boundary line of the query polygon – `$geoIntersects` would count it, `$geoWithin` might not. 
+To truly see the difference, we need to enrich our collection of with two different shapes - a Polygon for `Rakovski Stadium` and a LineString for `Vitosha boulevard`. 
+
+Then we'll do a query with another polygon, which represents `Triaditsa District`. 
+
+ What should happen is `$geoWithin` would require one polygon to be entirely inside the other, whereas `$geoIntersects` would include cases where they partially overlap (share any common area or edge). 
+
+Insert the documents for `Vitosha boulevard` and `Rakovski Stadium` into the `places` collection. 
+
+```json
+[
+  {
+    "type": "Feature", 
+    "properties" : { 
+      "name": "Булевард Витоша",
+      "name:en": "Vitosha boulevard"
+      }, 
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [23.3179150, 42.6860735],
+          [23.3108768, 42.6793554],
+          [23.3102636, 42.6779817]
+        ]
+      }
+  },
+  {
+    "type": "Feature", 
+    "properties" : { 
+      "name": "Стадион Раковски",
+      "name:en": "Rakovski Stadium"
+    }, 
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [[
+        [23.3035492, 42.6786215],
+			  [23.3044729, 42.6788327],
+			  [23.3047593, 42.6776691],
+			  [23.3038248, 42.6774727],
+			  [23.3035492, 42.6786215]
+      ]]
+    }
+  }
+]
+```
+Then, as we mentioned above, we will use `$geoWithin` and `$geoIntersects` to query within `Triaditsa district`. 
+Here is how it looks on the map: 
+
+![MongoDB Geolocation with MongoDB Compass](/assets/screenshots/geolocation_intersections_example.png) 
+
+Here is the query, which searches for objects that intersect with `Triaditsa district`. Note that we explicitly perform regex search for objects whose `"properties.name:en"` contains the words `stadium` and `boulevard`, since it would be tough to find them in a result list, containing hundreds of other objects (Points).  
+
+```json
+{
+  "geometry": {
+    "$geoIntersects": {
+      "$geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [23.3027587, 42.6793143],
+          [23.3153502, 42.6813200],
+          [23.3099409, 42.6745945],
+          [23.3077812, 42.6749431],
+          [23.3037779, 42.6747753],
+          [23.3027587, 42.6793143]
+         ]]
+      }
+    }
+  }, 
+  "properties.name:en" : { $in : [/stadium/i, /boulevard/i] }
+}
+```
+We should see in the results documents for both `Rakovski Stadium` and `Vitosha Boulevard`. 
+
+Now, we do the same query as above, however instead of `$geoIntersects`, lets try to use `$geoWithin`: 
+
+```json
+{
+  "geometry": {
+    "$geoWithin": {
+      "$geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [23.3027587, 42.6793143],
+          [23.3153502, 42.6813200],
+          [23.3099409, 42.6745945],
+          [23.3077812, 42.6749431],
+          [23.3037779, 42.6747753],
+          [23.3027587, 42.6793143]
+        ]]
+      }
+    }
+  }, 
+  "properties.name:en" : { $in : [/stadium/i, /boulevard/i] }
+}
+```
+
+What do we notice? Only the `Rakovski Stadium` is found. The `Vitosha boulevard` does not match to the query, as only part of it's shape (LineString) is within the `Triaditsa district` Polygon.  
+
 
 For completeness, we can also demonstrate `$geoIntersects` with a different geometry type. Suppose we draw a line through the city and want to find POIs that lie *on that line*. If we treat the line as a GeoJSON `LineString` query, `$geoIntersects` will return points that are exactly on that line (i.e., coordinates that intersect). This is a contrived example (exact matches are uncommon), but it shows the syntax:
 
@@ -259,7 +356,7 @@ For completeness, we can also demonstrate `$geoIntersects` with a different geom
 }
 ```
 
-This would list any points that happen to lie along the straight line between those two coordinates. Likely, you won’t get results unless a POI’s coordinates exactly match a point on the line. In real scenarios, $geoIntersects is more useful for line/polygon datasets, but now you’ve seen how to use it.
+This would list any points that happen to lie along the straight line between those two coordinates. Likely, you won’t get results unless a POI’s coordinates exactly match a point on the line. In real scenarios, `$geoIntersects` is more useful for line/polygon datasets, but now you’ve seen how to use it.
 
 ### 5. Combining Geospatial Filters with Other Criteria
 
@@ -267,14 +364,14 @@ Geospatial queries can be combined with standard MongoDB field queries. For inst
 
 You can simply include other fields in the query JSON alongside the geo query. All conditions must be true for a document to be returned (logical AND by default).
 
-**Example:** Find all restaurants within 1000 meters (1 km) of a given point. In our dataset, OpenStreetMap POIs have an `amenity` field under `properties` (e.g., `properties.amenity: "restaurant"` for restaurants). We can target that. Suppose we use coordinates of **Technical University of Sofia** (just as another location example: TU-Sofia is roughly `[23.3790, 42.6506]`). The query would be:
+**Example:** Find all restaurants within 1000 meters (1 km) of a given point. In our dataset, OpenStreetMap POIs have an `amenity` field under `properties` (e.g., `properties.amenity: "restaurant"` for restaurants). We can target that. Suppose we use coordinates of **Technical University of Sofia** (just as another location example: TU-Sofia is roughly `[23.3553, 42.6571]`). The query would be:
 
 ```json
 {
   "properties.amenity": "restaurant",
   "geometry": {
     "$near": {
-      "$geometry": { "type": "Point", "coordinates": [23.3790, 42.6506] },
+      "$geometry": { "type": "Point", "coordinates": [23.3553, 42.6571] },
       "$maxDistance": 1000
     }
   }
@@ -283,11 +380,11 @@ You can simply include other fields in the query JSON alongside the geo query. A
 
 This query has two conditions: the `amenity` must equal "restaurant" **and** the location must be within 1000m of the given point (and results sorted by nearest). Compass will return only documents that satisfy both – i.e., restaurants in that area, sorted by distance. If you run this, you should see only places that are restaurants, cafes, eateries, etc., and all located around TU-Sofia within 1 km (likely places in the Studentski Grad neighborhood).
 
-Another example: find all **parks** (perhaps `properties.leisure: "park"` in OSM data) within a certain polygon. You would combine a normal equality filter with a `$geoWithin`. For instance:
+Another example: find all **hotels** (perhaps `properties.tourism: "hotel"` in OSM data) within a certain polygon. You would combine a normal equality filter with a `$geoWithin`. For instance:
 
 ```json
 {
-  "properties.leisure": "park",
+  "properties.tourism": "hotel",
   "geometry": {
     "$geoWithin": {
       "$geometry": { ... polygon coordinates ... }
@@ -296,7 +393,7 @@ Another example: find all **parks** (perhaps `properties.leisure: "park"` in OSM
 }
 ```
 
-This would list parks inside that polygon. You can mix and match any number of filters. MongoDB will use indexes if available (so if you also had an index on `properties.amenity`, that would help the above query). By default, these conditions are ANDed together. If you need OR or more complex logic, you could use `$or` or even the Aggregation Pipeline in Compass, but that’s beyond our current scope.
+This would list hotels inside that polygon. You can mix and match any number of filters. MongoDB will use indexes if available (so if you also had an index on `properties.tourism`, that would help the above query). By default, these conditions are ANDed together. If you need OR or more complex logic, you could use `$or` or even the Aggregation Pipeline in Compass, but that’s beyond our current scope.
 
 With these examples, you’ve learned how to query for:
 - Nearest locations to a point.
@@ -311,17 +408,17 @@ All of these were done through Compass by writing JSON in the Filter field and c
 
 To solidify your understanding, try solving the following challenges using MongoDB Compass and the Bulgaria dataset. Each challenge may require writing a query (or multiple queries) in the Compass filter. Think about which operator ($near, $geoWithin, $geoIntersects) and what other filters or parameters you might need. 
 
-1. **Nearest Hospital:** Find the closest hospital to the city center of Sofia. Use the coordinates of Sofia’s center (or a known location) as your reference, and filter for `amenity: "hospital"`. (Hint: `$near` with a limit can find the single closest match. In Compass, you can set the **Limit** to 1 to get just the nearest result.)
+1. **Nearest Hospital:** Find the closest hospital to the city center of Sofia. Use the coordinates of Sofia’s center (or a known location) as your reference, and filter for `amenity: "hospital"`. (Hint: `$near` with a limit can find the single closest match. In Compass, you can set the **Limit** to 1 to get just the nearest result. This is done into the `Options` section.)
 
-2. **Parks within 3 km:** List all parks within a 3 km radius of **Alexander Nevsky Cathedral** (coordinates ~23.332956, 42.695833). Use the appropriate filter on `properties` (OSM might mark parks as `leisure: "park"` or `amenity: "park"` in the data) and a `$geoWithin` or `$near` query to find those within 3000 meters of the cathedral’s location.
+2. **Bars within 300m:** List all bars within a 3 km radius of **Alexander Nevsky Cathedral** (coordinates ~23.332956, 42.695833). Use the appropriate filter on `properties` (OSM might mark bars as `leisure: "bar"` or `amenity: "bar"` in the data) and a `$geoWithin` or `$near` query to find those within 300 meters of the cathedral’s location.
 
 3. **Neighborhood Query:** Imagine you have the polygon for the **Lozenets** district in Sofia (or draw an approximate polygon around it). Write a query to find all points of interest that fall inside Lozenets using `$geoWithin` with that polygon. (If you don’t have the exact coordinates, create a rough polygon and still perform the exercise.)
 
 4. **Intersecting a Route:** You have a planned route (as a LineString) going from Sofia University to NDK (National Palace of Culture). Construct a query using `$geoIntersects` with a LineString (between those two points’ coordinates) to find any **bus stops** (`amenity: "bus_stop"`) that lie along that route. *(This is a hypothetical scenario to practice $geoIntersects; the result might be empty if none fall exactly on the line, but set it up as if you were checking which stops intersect that path.)*
 
-5. **Multiple Conditions:** Find all museums within 1 km of a given point *and* that have “National” in their name. This will require combining a text filter on the name (you can use a regex like `"properties.name": /National/i` for case-insensitive match) with a `$geoWithin` or `$near` for the distance. Think carefully about how to structure this query JSON with two conditions.
+5. **Multiple Conditions:** Find all museums within 1 km of a given point *and* that have “National” in their name. This will require combining a text filter on the name (you can use a regex like `"properties.name:en": /National/i` for case-insensitive match), also we want to filter only the museum objects via `"properties.tourism" : "museum"` and also `$geoWithin` or `$near` for the distance. Think carefully about how to structure this query JSON with three conditions.
 
-6. **Outside a Radius (advanced):** (Challenge) Find all emergency shelters or clinics that are **more than** 5 km away from the city center. This will involve using a geospatial query to get those within 5 km and then inverting it (perhaps using `$not` or by comparing distances). MongoDB’s `$minDistance` option on `$near` might be helpful here to set a lower bound. *(This is an advanced task and may require reading MongoDB docs for $minDistance.)*
+6. **Outside a Radius (advanced):** (Challenge) Find all emergency shelters or clinics that are **more than** 5 km away from the city center. This will involve using a geospatial query to get those within 5 km and then inverting it (perhaps using `$not` or by comparing distances). MongoDB’s `$minDistance` option on `$near` might be helpful here to set a lower bound. Or maybe another option would be to use aggregation pipeline with the `$geoNear` operator? *(This is an advanced task and may require reading MongoDB docs for $minDistance.)*
 
 7. **Bonus – Which neighborhood?** (Conceptual) If you had a separate collection of Sofia neighborhoods (each as a polygon), how would you find which neighborhood a given point (e.g., a specific landmark) belongs to? Describe which operator you’d use and how (you don’t need to code it fully here). *(Hint: You would query the neighborhoods collection with $geoIntersects or $geoWithin using the point as the geometry.)*
 
