@@ -363,19 +363,19 @@ Once you have connection to the cluster, create `bank` database and insert into 
     "balance": 1000
   }, 
   {
-    "username": "dimitar",
+    "username": "ivan",
     "balance": 300
   }
 ]
 ```
 
-Now, execute the below statements, **IN CHUNKS**: 
+Now, execute the below statements, **IN CHUNKS**. Please **CHANGE** your database name in *Chunk 1* according to the account suffux number, provided by your teacher, i.e. for account `student001`, the db name will be `bank001`, for account `student002` db name will be `bank002`, and so on...: 
 
 ```javascript
 //Chunk 1:
 var session = db.getMongo().startSession();
 session.startTransaction();
-var accounts = session.getDatabase("bank").accounts;
+var accounts = session.getDatabase("bankXXX").accounts;
 
 //Chunk 2:
 accounts.updateOne( { username: "borislav" }, { $inc: { balance: -100 } } );
