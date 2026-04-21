@@ -4,8 +4,8 @@ pubDatetime: 2026-04-19T12:00:00Z
 modDatetime: 2026-04-19T12:00:00Z
 title: Build a Simple Node.js, Express, and MongoDB Driver App
 featured: false
-image: /assets/images/mongoQueryBoy.webp
-ogImage: /assets/images/mongoQueryBoy.webp
+image: /assets/images/appDevBoy.png
+ogImage: /assets/images/appDevBoy.png
 tags:
   - mongodb
   - tutorial
